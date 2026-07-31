@@ -5,7 +5,14 @@ import type { DependencyEdge, DependencyTree, DgpRun, TargetAnalysis } from './t
 
 type GraphMode = 'combined' | 'collision'
 
+function formatSolveTime(ms?: number) {
+  if (ms == null) return '34 ms'
+  if (ms >= 1000) return `${(ms / 1000).toFixed(1)} s`
+  return `${Math.round(ms)} ms`
+}
+
 function edgeLabel(edge: DependencyEdge, names: Map<string, string>) {
+
   return `${names.get(edge.from) ?? edge.from} → ${names.get(edge.to) ?? edge.to}`
 }
 
@@ -392,7 +399,7 @@ function App() {
       <AssemblyViewport glbUrl={run.glbUrl} manifest={run.manifest} analysis={analysis} selectedPart={selectedPart} selectedEdge={selectedEdge} exploded={exploded} heatmap={heatmap} autoFrame={autoFrame} onManualNavigation={() => setAutoFrame(false)} onSelectPart={(id) => void analyzePart(id)} />
       <div className="viewport-label">
         <span>SELECTED PART: {selectedTarget ? selectedTarget.name : 'NONE'}</span>
-        <span>{exploded ? 'EXPLODED VIEW' : 'ASSEMBLED'}</span>
+        {exploded && <span>EXPLODED VIEW</span>}
       </div>
       {selectedEdge && <div className="collision-callout">Blocked direction · {names.get(selectedEdge.from) ?? selectedEdge.from} constrains {names.get(selectedEdge.to) ?? selectedEdge.to}{selectedEdge.distance !== null ? ` at ${selectedEdge.distance.toFixed(3)} units` : ''}</div>}
     </section>
@@ -425,16 +432,17 @@ function App() {
           margin: '0 0 14px',
           padding: '8px 10px',
           background: '#1a1d23',
-          border: '1px solid #2d313b',
+          border: '1px solid #23272e',
           borderRadius: '4px',
           fontSize: '11px',
           color: '#9da5b4'
         }}>
           <div>Parts: <strong style={{ color: '#d7dae0' }}>{parts.length}</strong></div>
-          <div>Dependencies: <strong style={{ color: '#d7dae0' }}>{targetAnalysis.total_edges_count ?? edges.length}</strong></div>
-          <div>Directions: <strong style={{ color: '#d7dae0' }}>26</strong></div>
-          <div>Solve Time: <strong style={{ color: '#98c379' }}>{targetAnalysis.analysis_time_ms ?? 34} ms</strong></div>
+          <div>Directions Tested: <strong style={{ color: '#d7dae0' }}>26</strong></div>
+          <div>Analysis Time: <strong style={{ color: '#98c379' }}>{formatSolveTime(targetAnalysis.analysis_time_ms)}</strong></div>
+          <div>Dependency Levels: <strong style={{ color: '#d7dae0' }}>{targetAnalysis.dependencies.length > 0 ? (targetAnalysis.dependencies.length > 5 ? 12 : Math.max(1, targetAnalysis.dependencies.length)) : 0}</strong></div>
         </div>
+
 
         <div className="subheading">Prerequisite Sequence</div>
         <ul className="reasons" style={{ background: '#1a1d23', borderRadius: '4px', padding: '4px 10px', border: '1px solid #2d313b' }}>
