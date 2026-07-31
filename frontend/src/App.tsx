@@ -131,19 +131,21 @@ function HierarchicalDirectedGraph({ tree, targetAnalysis, names, onSelectPart, 
             width={cardWidth}
             height={cardHeight}
             rx="4"
-            fill={isTarget ? '#1a2332' : isSelected ? '#2c313a' : '#1a1d23'}
-            stroke={isTarget ? '#61afef' : isSelected ? '#e5c07b' : '#3e4451'}
-            strokeWidth={isTarget || isSelected ? 2 : 1}
+            fill={isTarget ? '#0d2838' : isSelected ? '#2c313a' : '#1a1d23'}
+            stroke={isTarget ? '#00f0ff' : isSelected ? '#e5c07b' : '#3e4451'}
+            strokeWidth={isTarget ? 3 : isSelected ? 2 : 1}
+            style={isTarget ? { filter: 'drop-shadow(0 0 6px rgba(0, 240, 255, 0.6))' } : undefined}
           />
           <text
             x={pos.x}
             y={pos.y + 4}
             textAnchor="middle"
-            fill={isTarget ? '#61afef' : isSelected ? '#e5c07b' : '#abb2bf'}
+            fill={isTarget ? '#00f0ff' : isSelected ? '#e5c07b' : '#abb2bf'}
             fontSize="10"
-            fontWeight={isTarget ? '700' : '500'}
+            fontWeight={isTarget ? '800' : '500'}
             fontFamily="sans-serif"
           >
+
             {name.length > 15 ? name.slice(0, 14) + '…' : name}
           </text>
         </g>

@@ -129,13 +129,16 @@ function Model({ glbUrl, manifest, analysis, selectedPart, selectedEdge, explode
         const isEdgeSelected = selectedEdge && (part.part_id === selectedEdge.from || part.part_id === selectedEdge.to)
         const isDimmed = analysis.target && !isTarget && !isPrerequisite
 
-        stdMat.opacity = isDimmed ? 0.35 : 1.0
+        stdMat.opacity = isDimmed ? 0.22 : 1.0
 
         if (isTarget) {
-          stdMat.color.set('#00e5ff')
-          stdMat.emissive.set('#0088cc')
-          stdMat.emissiveIntensity = 0.45
+          stdMat.color.set('#00ffff')
+          stdMat.emissive.set('#00c8ff')
+          stdMat.emissiveIntensity = 0.85
+          stdMat.roughness = 0.15
+          stdMat.metalness = 0.05
         } else if (isEdgeSelected) {
+
           stdMat.color.set('#e06c75')
           stdMat.emissive.set('#991111')
           stdMat.emissiveIntensity = 0.5
