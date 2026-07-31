@@ -9,31 +9,118 @@ function edgeLabel(edge: DependencyEdge, names: Map<string, string>) {
   return `${names.get(edge.from) ?? edge.from} → ${names.get(edge.to) ?? edge.to}`
 }
 
-function DependencyGraph({ edges, names, selectedEdge, onSelectEdge, onSelectPart }: {
+function edgeConstraintLabel(edge: DependencyEdge) {
+  if (!edge.required) return `Alternative path · ${edge.direction}`
+  return `Blocks ${edge.direction} exit`
+}
+
+function DependencyGraph({ edges, names, targetId, selectedEdge, onSelectEdge, onSelectPart }: {
   edges: DependencyEdge[]
   names: Map<string, string>
+  targetId: string | undefined
   selectedEdge: DependencyEdge | null
   onSelectEdge: (edge: DependencyEdge) => void
   onSelectPart: (id: string) => void
 }) {
-  const nodes = [...new Set(edges.flatMap((edge) => [edge.from, edge.to]))]
-  if (!nodes.length) return null
-  const positions = new Map(nodes.map((id, index) => {
-    const angle = -Math.PI / 2 + (Math.PI * 2 * index) / nodes.length
-    return [id, { x: 120 + Math.cos(angle) * 75, y: 86 + Math.sin(angle) * 52 }]
-  }))
-  const label = (id: string) => (names.get(id) ?? id).slice(0, 13)
-  return <svg className="dependency-graph" viewBox="0 0 240 172" aria-label="Interactive target dependency graph">
-    <defs><marker id="arrow-collision" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#ff756c" /></marker></defs>
+  // Build a layered top-down hierarchy: target at top, blockers layer below, their blockers below that
+  const allNodes = [...new Set(edges.flatMap((e) => [e.from, e.to]))]
+  if (!allNodes.length) return null
+
+  // Assign layers: target = 0, direct blockers of target = 1, their blockers = 2...
+  const layers = new Map<string, number>()
+  const childrenOf = new Map<string, string[]>() // who blocks this node
+  for (const e of edges) {
+    if (!childrenOf.has(e.to)) childrenOf.set(e.to, [])
+    childrenOf.get(e.to)!.push(e.from)
+  }
+  // BFS from target downward
+  const bfsQueue: string[] = targetId && allNodes.includes(targetId) ? [targetId] : [allNodes[0]]
+  layers.set(bfsQueue[0], 0)
+  for (let qi = 0; qi < bfsQueue.length; qi++) {
+    const current = bfsQueue[qi]
+    const depth = layers.get(current)!
+    for (const blocker of (childrenOf.get(current) ?? [])) {
+      if (!layers.has(blocker)) {
+        layers.set(blocker, depth + 1)
+        bfsQueue.push(blocker)
+      }
+    }
+  }
+
+  // Group nodes by layer and compute X positions
+  const maxLayer = Math.max(...[...layers.values()])
+  const byLayer = new Map<number, string[]>()
+  for (const [id, layer] of layers) {
+    if (!byLayer.has(layer)) byLayer.set(layer, [])
+    byLayer.get(layer)!.push(id)
+  }
+
+  const W = 240, ROW_H = 54, NODE_R = 14
+  const svgH = Math.max(130, (maxLayer + 1) * ROW_H + 30)
+  const positions = new Map<string, { x: number; y: number }>()
+  for (const [layer, ids] of byLayer) {
+    const y = 22 + layer * ROW_H
+    const step = W / (ids.length + 1)
+    ids.forEach((id, i) => positions.set(id, { x: step * (i + 1), y }))
+  }
+
+  const label = (id: string) => (names.get(id) ?? id).replace(/_/g, ' ').slice(0, 14)
+
+  return <svg className="dependency-graph" viewBox={`0 0 ${W} ${svgH}`} aria-label="Blocker graph — arrows point toward the part that must be removed next">
+    <defs>
+      <marker id="arr-req" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M 0 1 L 9 5 L 0 9 z" fill="#ff756c" />
+      </marker>
+      <marker id="arr-opt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M 0 1 L 9 5 L 0 9 z" fill="#5a4040" />
+      </marker>
+    </defs>
+    {/* Edges — drawn from blocker up toward the part it blocks */}
     {edges.map((edge, index) => {
-      const from = positions.get(edge.from)!, to = positions.get(edge.to)!
+      const from = positions.get(edge.from), to = positions.get(edge.to)
+      if (!from || !to) return null
       const selected = edge === selectedEdge
-      return <line key={`${edge.from}-${edge.to}-${edge.direction}-${index}`} x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke={edge.required ? '#ff756c' : '#765050'} strokeOpacity={edge.required ? 1 : .42} strokeWidth={selected ? 3 : edge.required ? 2 : 1} strokeDasharray={edge.required ? undefined : '3 3'} markerEnd="url(#arrow-collision)" onClick={() => onSelectEdge(edge)} />
+      // draw arrow from blocker (lower layer) up to blocked part (upper layer)
+      const dx = to.x - from.x, dy = to.y - from.y
+      const len = Math.sqrt(dx * dx + dy * dy) || 1
+      const ex = to.x - (dx / len) * (NODE_R + 3)
+      const ey = to.y - (dy / len) * (NODE_R + 3)
+      const sx = from.x + (dx / len) * (NODE_R + 3)
+      const sy = from.y + (dy / len) * (NODE_R + 3)
+      return <line
+        key={`${edge.from}-${edge.to}-${edge.direction}-${index}`}
+        x1={sx} y1={sy} x2={ex} y2={ey}
+        stroke={edge.required ? (selected ? '#ff3b30' : '#ff756c') : '#5a4040'}
+        strokeOpacity={edge.required ? 1 : 0.5}
+        strokeWidth={selected ? 3 : edge.required ? 1.8 : 1}
+        strokeDasharray={edge.required ? undefined : '4 3'}
+        markerEnd={edge.required ? 'url(#arr-req)' : 'url(#arr-opt)'}
+        style={{ cursor: 'pointer' }}
+        onClick={() => onSelectEdge(edge)}
+      >
+        <title>{edgeConstraintLabel(edge)}</title>
+      </line>
     })}
-    {nodes.map((id) => {
-      const point = positions.get(id)!
-      return <g key={id} className="graph-node" onClick={() => onSelectPart(id)}><circle cx={point.x} cy={point.y} r="18" /><text x={point.x} y={point.y + 31} textAnchor="middle">{label(id)}</text></g>
+    {/* Edge direction badges */}
+    {edges.map((edge, index) => {
+      const from = positions.get(edge.from), to = positions.get(edge.to)
+      if (!from || !to || !edge.required) return null
+      const mx = (from.x + to.x) / 2, my = (from.y + to.y) / 2
+      return <text key={`lbl-${index}`} x={mx} y={my - 3} textAnchor="middle" fontSize="8" fill="#ff9480" style={{ pointerEvents: 'none' }}>{edge.direction}</text>
     })}
+    {/* Nodes */}
+    {allNodes.map((id) => {
+      const pt = positions.get(id)
+      if (!pt) return null
+      const isTarget = id === targetId
+      return <g key={id} className="graph-node" onClick={() => onSelectPart(id)}>
+        <circle cx={pt.x} cy={pt.y} r={NODE_R} fill={isTarget ? '#0a3d52' : '#152535'} stroke={isTarget ? '#00e5ff' : '#5f879f'} strokeWidth={isTarget ? 2 : 1} />
+        {isTarget && <circle cx={pt.x} cy={pt.y} r={NODE_R + 4} fill="none" stroke="#00e5ff" strokeWidth="1" strokeOpacity="0.35" />}
+        <text x={pt.x} y={pt.y + NODE_R + 11} textAnchor="middle" fontSize="7.5" fill={isTarget ? '#a0e8ff' : '#b9c9d8'} style={{ pointerEvents: 'none' }}>{label(id)}</text>
+      </g>
+    })}
+    {/* Legend */}
+    <text x="4" y={svgH - 4} fontSize="7" fill="#4a6070">↑ arrow = blocks removal of</text>
   </svg>
 }
 
@@ -185,15 +272,15 @@ function App() {
           <span>{part.name}</span>{heatmap && <span className={`constraint-count c${Math.min(3, constraintCounts.get(part.id) ?? 0)}`}>{constraintCounts.get(part.id) ?? 0}</span>}{part.fastener.value && <em>fastener</em>}
         </button>)}
       </div>
-      <div className="graph-header"><span>Target graph</span><div className="segmented">
+      <div className="graph-header"><span>Blocker Graph</span><div className="segmented">
         {(['combined', 'collision'] as GraphMode[]).map((mode) => <button key={mode} className={graphMode === mode ? 'active' : ''} onClick={() => setGraphMode(mode)}>{mode === 'combined' ? 'All' : 'Collision'}</button>)}
       </div></div>
       <div className="edge-list">
-        {!targetAnalysis && <p className="empty">Select a target part to build its dependency graph.</p>}
-        {targetAnalysis && edges.length === 0 && <p className="empty">This target has a verified direct exit.</p>}
-        <DependencyGraph edges={edges} names={names} selectedEdge={selectedEdge} onSelectEdge={(edge) => { setSelectedEdge(edge); setSelectedPart(edge.to) }} onSelectPart={(id) => void analyzePart(id)} />
+        {!targetAnalysis && <p className="empty">Select a target part — arrows will show what must be removed first.</p>}
+        {targetAnalysis && edges.length === 0 && <p className="empty">This target has a verified direct exit — nothing blocks it.</p>}
+        <DependencyGraph edges={edges} names={names} targetId={selectedTarget?.id} selectedEdge={selectedEdge} onSelectEdge={(edge) => { setSelectedEdge(edge); setSelectedPart(edge.to) }} onSelectPart={(id) => void analyzePart(id)} />
         {edges.map((edge, index) => <button key={`${edge.from}-${edge.to}-${edge.direction}-${index}`} className={`edge ${selectedEdge === edge ? 'selected' : 'collision'}`} onClick={() => { setSelectedEdge(edge); setSelectedPart(edge.to) }}>
-          <span className="edge-type">⊗</span><span>{edgeLabel(edge, names)}</span><small>{edge.required ? `required exit constraint · ${edge.direction}` : `alternative path · ${edge.direction}`}</small>
+          <span className="edge-type">⊗</span><span>{edgeLabel(edge, names)}</span><small>{edge.required ? `Blocks removal along ${edge.direction}` : `Optional path · ${edge.direction}`}</small>
         </button>)}
       </div>
     </aside>
