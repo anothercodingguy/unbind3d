@@ -14,9 +14,11 @@ type ViewportProps = {
   exploded: boolean
   heatmap: boolean
   autoFrame: boolean
+  removedPartIds?: Set<string>
   onManualNavigation: () => void
   onSelectPart: (id: string) => void
 }
+
 
 const asVector = (value: Vec3) => new THREE.Vector3(value[0], value[1], value[2])
 
@@ -81,7 +83,7 @@ function partRandomColor(partId: string) {
   return BLENDER_WORKBENCH_COLORS[index]
 }
 
-function Model({ glbUrl, manifest, analysis, selectedPart, selectedEdge, exploded, heatmap, onSelectPart }: Omit<ViewportProps, 'autoFrame' | 'onManualNavigation'>) {
+function Model({ glbUrl, manifest, analysis, selectedPart, selectedEdge, exploded, heatmap, removedPartIds, onSelectPart }: Omit<ViewportProps, 'autoFrame' | 'onManualNavigation'>) {
   const { scene } = useGLTF(glbUrl)
   const model = useMemo(() => scene.clone(true), [scene])
   const originals = useRef(new Map<string, THREE.Vector3>())
@@ -100,6 +102,10 @@ function Model({ glbUrl, manifest, analysis, selectedPart, selectedEdge, explode
     model.traverse((object) => {
       const part = partForNode(object.name)
       if (!part) return
+      const isRemoved = removedPartIds?.has(part.part_id) ?? false
+      object.visible = !isRemoved
+      if (isRemoved) return
+
       if (!originals.current.has(part.part_id)) originals.current.set(part.part_id, object.position.clone())
       const base = originals.current.get(part.part_id)!.clone()
       const { option } = chosenExit(analysis, part.part_id)
@@ -107,6 +113,7 @@ function Model({ glbUrl, manifest, analysis, selectedPart, selectedEdge, explode
         base.addScaledVector(asVector(option.vector), Math.min(option.travel_distance * 0.12, 1.1))
       }
       object.position.copy(base)
+
       object.traverse((child) => {
         if (!(child instanceof THREE.Mesh)) return
         let material = child.material
@@ -162,7 +169,10 @@ function Model({ glbUrl, manifest, analysis, selectedPart, selectedEdge, explode
         }
       })
     })
-  }, [model, analysis, selectedPart, selectedEdge, exploded, heatmap, prerequisiteIds, blockerCounts])
+  }, [model, analysis, selectedPart, selectedEdge, exploded, heatmap, prerequisiteIds, blockerCounts, removedPartIds])
+
+
+
 
 
   const focusedPart = analysis.parts.find((part) => part.id === selectedPart)

@@ -301,16 +301,18 @@ function App() {
     }
   }
 
-  async function analyzePart(partId: string) {
+  const [removedPartIds, setRemovedPartIds] = useState<Set<string>>(new Set())
+
+  async function analyzePart(partId: string, currentRemoved: Set<string> = removedPartIds) {
     if (!run) return
 
-    if (selectedTarget?.id === partId && targetAnalysis) {
+    if (currentRemoved.size === 0 && selectedTarget?.id === partId && targetAnalysis) {
       setSelectedPart(partId)
       setSelectedEdge(null)
       return
     }
 
-    if (analysisCache.current.has(partId)) {
+    if (currentRemoved.size === 0 && analysisCache.current.has(partId)) {
       const cached = analysisCache.current.get(partId)!
       setTargetAnalysis(cached)
       setSelectedPart(cached.target?.id ?? partId)
@@ -327,11 +329,14 @@ function App() {
       form.append('glb', run.glbFile)
       form.append('manifest_json', JSON.stringify(run.manifest))
       form.append('target', partId)
+      form.append('removed_parts_json', JSON.stringify([...currentRemoved]))
       const response = await fetch('http://127.0.0.1:8000/api/analyze-target', { method: 'POST', body: form })
       const payload = await response.json() as TargetAnalysis | { detail: string }
       if (!response.ok) throw new Error((payload as { detail: string }).detail)
       const next = payload as TargetAnalysis
-      analysisCache.current.set(partId, next)
+      if (currentRemoved.size === 0) {
+        analysisCache.current.set(partId, next)
+      }
       setTargetAnalysis(next)
       setSelectedPart(next.target?.id ?? partId)
     } catch (caught) {
@@ -340,6 +345,26 @@ function App() {
       setAnalyzingTarget(false)
     }
   }
+
+  async function removePart(partId: string) {
+    const nextRemoved = new Set(removedPartIds)
+    nextRemoved.add(partId)
+    setRemovedPartIds(nextRemoved)
+    const activeTargetId = selectedTarget?.id ?? selectedPart
+    if (activeTargetId) {
+      await analyzePart(activeTargetId, nextRemoved)
+    }
+  }
+
+  async function resetAssembly() {
+    const emptySet = new Set<string>()
+    setRemovedPartIds(emptySet)
+    const activeTargetId = selectedTarget?.id ?? selectedPart
+    if (activeTargetId) {
+      await analyzePart(activeTargetId, emptySet)
+    }
+  }
+
 
   if (!run || !analysis) return <main className="landing">
     <section className="landing-card">
@@ -366,6 +391,14 @@ function App() {
       <div><span className="brand">UNBIND3D</span><span className="divider">/</span><span className="run-name">{run.filename}</span></div>
       <div className="top-actions">
         <span className="status verified">VERIFIED GEOMETRY ANALYSIS</span>
+        <button
+          onClick={() => void resetAssembly()}
+          className={removedPartIds.size > 0 ? 'active' : ''}
+          style={removedPartIds.size > 0 ? { background: '#2c313a', borderColor: '#e5c07b', color: '#e5c07b' } : undefined}
+          title="Restore all removed parts to original assembly state"
+        >
+          Reset Assembly {removedPartIds.size > 0 ? `(${removedPartIds.size} removed)` : ''}
+        </button>
         <button onClick={() => setAutoFrame((value) => !value)} className={autoFrame ? 'active' : ''}>Auto Frame</button>
         <button onClick={() => setExploded((value) => !value)} className={exploded ? 'active' : ''}>Exploded View</button>
         <button onClick={() => setHeatmap((value) => !value)} className={heatmap ? 'active' : ''}>Constraint Heatmap</button>
@@ -398,7 +431,7 @@ function App() {
       title="Drag left/right to resize left panel"
     />
     <section className="viewport-shell">
-      <AssemblyViewport glbUrl={run.glbUrl} manifest={run.manifest} analysis={analysis} selectedPart={selectedPart} selectedEdge={selectedEdge} exploded={exploded} heatmap={heatmap} autoFrame={autoFrame} onManualNavigation={() => setAutoFrame(false)} onSelectPart={(id) => void analyzePart(id)} />
+      <AssemblyViewport glbUrl={run.glbUrl} manifest={run.manifest} analysis={analysis} selectedPart={selectedPart} selectedEdge={selectedEdge} exploded={exploded} heatmap={heatmap} autoFrame={autoFrame} removedPartIds={removedPartIds} onManualNavigation={() => setAutoFrame(false)} onSelectPart={(id) => void analyzePart(id)} />
       <div className="viewport-label">
         <span>SELECTED PART: {selectedTarget ? selectedTarget.name : 'NONE'}</span>
         {exploded && <span>EXPLODED VIEW</span>}
@@ -426,6 +459,15 @@ function App() {
           </div>}
         </div>
 
+        {targetAnalysis.count === 0 && <div className="validation valid" style={{ background: '#10291f', border: '1px solid #2d5948', padding: '12px', borderRadius: '4px', margin: '10px 0' }}>
+          <strong style={{ color: '#98c379', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span>✓</span> Target can now be removed
+          </strong>
+          <span style={{ color: '#abb2bf', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+            All prerequisite blockers cleared — verified exit vector available.
+          </span>
+        </div>}
+
         {/* CAD Solver Metrics */}
         <div style={{
           display: 'grid',
@@ -448,9 +490,19 @@ function App() {
 
         <div className="subheading">Prerequisite Sequence</div>
         <ul className="reasons" style={{ background: '#1a1d23', borderRadius: '4px', padding: '4px 10px', border: '1px solid #2d313b' }}>
-          {targetAnalysis.dependencies.length === 0 && <li style={{ color: '#98c379' }}>Direct Exit Verified (No prerequisites required)</li>}
-          {targetAnalysis.dependencies.map((dependency) => <li key={dependency.id} style={{ cursor: 'pointer', padding: '6px 0' }} onClick={() => void analyzePart(dependency.id)}>
-            <span style={{ color: '#61afef', fontWeight: 600, marginRight: '8px' }}>{dependency.order}.</span> <span style={{ color: '#abb2bf' }}>{dependency.name}</span>
+          {targetAnalysis.dependencies.length === 0 && <li style={{ color: '#98c379' }}>✓ Direct Exit Verified (No prerequisites required)</li>}
+          {targetAnalysis.dependencies.map((dependency) => <li key={dependency.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #23272e' }}>
+            <div style={{ cursor: 'pointer', flex: 1 }} onClick={() => void analyzePart(dependency.id)}>
+              <span style={{ color: '#61afef', fontWeight: 600, marginRight: '8px' }}>{dependency.order}.</span>
+              <span style={{ color: '#abb2bf' }}>{dependency.name}</span>
+            </div>
+            <button
+              onClick={(e) => { e.stopPropagation(); void removePart(dependency.id) }}
+              style={{ fontSize: '10px', padding: '3px 8px', background: '#2c313a', borderColor: '#3e4451', color: '#e5c07b', borderRadius: '3px', cursor: 'pointer' }}
+              title={`Simulate removal of ${dependency.name}`}
+            >
+              Remove
+            </button>
           </li>)}
         </ul>
 
@@ -465,9 +517,27 @@ function App() {
     </aside>
     <footer className="timeline target-footer">
       <div className="target-count"><span>REQUIRED PARTS</span><strong>{targetAnalysis?.count ?? '—'}</strong></div>
-      <div className="prerequisite-rail">{targetAnalysis?.dependencies.map((dependency) => <button key={dependency.id} onClick={() => void analyzePart(dependency.id)}><span>{dependency.order}</span><small>{dependency.name}</small></button>)}{targetAnalysis && targetAnalysis.dependencies.length === 0 && <span className="empty">No prerequisite parts required — direct exit available.</span>}</div>
+      <div className="prerequisite-rail">
+        {targetAnalysis?.dependencies.map((dependency) => (
+          <div key={dependency.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <button onClick={() => void analyzePart(dependency.id)}>
+              <span>{dependency.order}</span>
+              <small>{dependency.name}</small>
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); void removePart(dependency.id) }}
+              style={{ padding: '4px 6px', background: '#2c313a', borderColor: '#3e4451', color: '#e5c07b', fontSize: '10px', height: '100%', borderRadius: '3px', cursor: 'pointer' }}
+              title={`Remove ${dependency.name}`}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        {targetAnalysis && targetAnalysis.dependencies.length === 0 && <span className="empty" style={{ color: '#98c379', fontWeight: 600 }}>✓ Target can now be removed</span>}
+      </div>
     </footer>
   </main>
+
 }
 
 export default App

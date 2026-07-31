@@ -101,13 +101,14 @@ class DisassemblySolver:
                 distances.append((bounds[0, axis] - part.bounds[1, axis]) / component)
         return max(0.0, max(distances, default=0.0)) + self.clearance
 
-    def test_direction(self, part: Part, direction: np.ndarray) -> DirectionTest:
+    def test_direction(self, part: Part, direction: np.ndarray, removed_set: set[str] | None = None) -> DirectionTest:
         """Record every part that blocks one candidate target translation."""
+        removed = removed_set or set()
         travel = self.escape_distance(part, direction)
         translation = direction * travel
         hits: list[tuple[float, int, str, Any]] = []
         for other in sorted(self.parts.values(), key=lambda item: item.order):
-            if other.id == part.id:
+            if other.id == part.id or other.id in removed:
                 continue
             hit = self.engine.sweep(part.id, other.id, translation, self.probe_distance)
             if hit.blocked:
@@ -137,12 +138,14 @@ class DisassemblySolver:
     def _direction_rank(self, direction: np.ndarray) -> int:
         return next(index for index, item in enumerate(self.directions) if np.allclose(item, direction))
 
-    def _evaluate(self, part_id: str) -> dict[str, Any]:
-        cached = self._evaluations.get(part_id)
+    def _evaluate(self, part_id: str, removed_set: set[str] | None = None) -> dict[str, Any]:
+        removed = removed_set or set()
+        cache_key = (part_id, frozenset(removed))
+        cached = self._evaluations.get(cache_key)
         if cached is not None:
             return cached
         part = self.parts[part_id]
-        tests = [self.test_direction(part, direction) for direction in self.directions]
+        tests = [self.test_direction(part, direction, removed) for direction in self.directions]
         options = [
             {
                 "direction": test.label,
@@ -161,7 +164,7 @@ class DisassemblySolver:
             "exit_options": options,
             "removable_now": any(test.result == "free" for test in tests),
         }
-        self._evaluations[part_id] = result
+        self._evaluations[cache_key] = result
         return result
 
     def _option_key(self, option: dict[str, Any]) -> tuple[Any, ...]:
@@ -171,19 +174,13 @@ class DisassemblySolver:
             int(option["direction_rank"]),
         )
 
-    def analyze_target(self, target_part_name: str) -> dict[str, Any]:
-        """Return the selected part's recursive, minimal prerequisite tree.
-
-        Every candidate direction is physically tested.  When no direct exit is
-        free, each candidate represents an AND-set of blockers.  The analyzer
-        recursively evaluates only those alternatives and chooses the route
-        with the fewest unique prerequisite parts; ties use travel distance and
-        the fixed direction enumeration.  This is target-local dependency
-        resolution, not a global assembly plan.
-        """
+    def analyze_target(self, target_part_name: str, removed_parts: list[str] | set[str] | None = None) -> dict[str, Any]:
+        """Return the selected part's recursive, minimal prerequisite tree."""
         import time
         start_time = time.perf_counter()
         target_id = self._resolve_part_id(target_part_name)
+        removed_set = set(removed_parts or [])
+
 
 
         @lru_cache(maxsize=8192)

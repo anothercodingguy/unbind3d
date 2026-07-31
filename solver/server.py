@@ -144,6 +144,7 @@ async def analyze_target(
     glb: UploadFile = File(...),
     manifest_json: str = Form(...),
     target: str = Form(...),
+    removed_parts_json: str = Form("[]"),
 ) -> dict:
     if not glb.filename or not glb.filename.lower().endswith(".glb"):
         raise HTTPException(status_code=400, detail="A GLB file is required")
@@ -151,11 +152,16 @@ async def analyze_target(
         manifest = json.loads(manifest_json)
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=400, detail="Manifest must be valid JSON") from exc
+    try:
+        removed_parts = json.loads(removed_parts_json) if removed_parts_json else []
+    except json.JSONDecodeError:
+        removed_parts = []
     with tempfile.TemporaryDirectory(prefix="unbind3d-") as directory:
         path = Path(directory) / "assembly.glb"
         path.write_bytes(await glb.read())
         try:
             solver = DisassemblySolver(load_parts(path, manifest))
-            return await asyncio.to_thread(solver.analyze_target, target)
+            return await asyncio.to_thread(solver.analyze_target, target, removed_parts)
         except (RuntimeError, ValueError) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+
