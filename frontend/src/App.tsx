@@ -9,35 +9,144 @@ function edgeLabel(edge: DependencyEdge, names: Map<string, string>) {
   return `${names.get(edge.from) ?? edge.from} → ${names.get(edge.to) ?? edge.to}`
 }
 
-function DependencyGraph({ edges, names, selectedEdge, onSelectEdge, onSelectPart }: {
-  edges: DependencyEdge[]
+function HierarchicalDirectedGraph({ tree, targetAnalysis, names, onSelectPart, selectedPart }: {
+  tree: DependencyTree | null
+  targetAnalysis: TargetAnalysis | null
   names: Map<string, string>
-  selectedEdge: DependencyEdge | null
-  onSelectEdge: (edge: DependencyEdge) => void
   onSelectPart: (id: string) => void
+  selectedPart: string | null
 }) {
-  const nodes = [...new Set(edges.flatMap((edge) => [edge.from, edge.to]))]
-  if (!nodes.length) return null
-  const positions = new Map(nodes.map((id, index) => {
-    const angle = -Math.PI / 2 + (Math.PI * 2 * index) / nodes.length
-    return [id, { x: 120 + Math.cos(angle) * 75, y: 86 + Math.sin(angle) * 52 }]
-  }))
-  const label = (id: string) => (names.get(id) ?? id).slice(0, 13)
-  return <svg className="dependency-graph" viewBox="0 0 240 172" aria-label="Interactive target dependency graph">
-    <defs><marker id="arrow-collision" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#ff756c" /></marker></defs>
-    {edges.map((edge, index) => {
-      const from = positions.get(edge.from)!, to = positions.get(edge.to)!
-      const selected = edge === selectedEdge
-      return <line key={`${edge.from}-${edge.to}-${edge.direction}-${index}`} x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke={edge.required ? '#ff756c' : '#765050'} strokeOpacity={edge.required ? 1 : .42} strokeWidth={selected ? 3 : edge.required ? 2 : 1} strokeDasharray={edge.required ? undefined : '3 3'} markerEnd="url(#arrow-collision)" onClick={() => onSelectEdge(edge)} />
-    })}
-    {nodes.map((id) => {
-      const point = positions.get(id)!
-      return <g key={id} className="graph-node" onClick={() => onSelectPart(id)}><circle cx={point.x} cy={point.y} r="18" /><text x={point.x} y={point.y + 31} textAnchor="middle">{label(id)}</text></g>
-    })}
-  </svg>
+  const { nodesByLevel, edges, maxLevel } = useMemo(() => {
+    if (!tree) return { nodesByLevel: [], edges: [], maxLevel: 0 }
+
+    const levels = new Map<string, number>()
+    const edgeList: Array<{ from: string; to: string }> = []
+    const visitedEdges = new Set<string>()
+
+    function traverse(node: DependencyTree, level: number) {
+      if (!levels.has(node.part_id) || level < levels.get(node.part_id)!) {
+        levels.set(node.part_id, level)
+      }
+
+      for (const child of node.children) {
+        const edgeKey = `${child.part_id}->${node.part_id}`
+        if (!visitedEdges.has(edgeKey)) {
+          visitedEdges.add(edgeKey)
+          edgeList.push({ from: child.part_id, to: node.part_id })
+        }
+        traverse(child, level + 1)
+      }
+    }
+
+    traverse(tree, 0)
+
+    const maxL = Math.max(0, ...Array.from(levels.values()))
+    const byLevel: string[][] = Array.from({ length: maxL + 1 }, () => [])
+    
+    levels.forEach((lvl, partId) => {
+      byLevel[lvl].push(partId)
+    })
+
+    return { nodesByLevel: byLevel, edges: edgeList, maxLevel: maxL }
+  }, [tree])
+
+  if (!tree || nodesByLevel.length === 0) return null
+
+  const cardWidth = 110
+  const cardHeight = 28
+  const levelHeight = 64
+
+  const maxNodesInLevel = Math.max(1, ...nodesByLevel.map((lvl) => lvl.length))
+  const svgWidth = Math.max(250, maxNodesInLevel * 120)
+  const svgHeight = Math.max(130, (maxLevel + 1) * levelHeight + 16)
+
+  const nodePositions = new Map<string, { x: number; y: number }>()
+  nodesByLevel.forEach((lvlNodes, levelIndex) => {
+    const y = 30 + levelIndex * levelHeight
+    const count = lvlNodes.length
+    lvlNodes.forEach((partId, i) => {
+      const x = (i + 1) * (svgWidth / (count + 1))
+      nodePositions.set(partId, { x, y })
+    })
+  })
+
+  return <div style={{ width: '100%', overflowX: 'auto', padding: '4px 0' }}>
+    <svg width={svgWidth} height={svgHeight} viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ display: 'block', margin: '0 auto' }}>
+      <defs>
+        <marker id="arrow-up" viewBox="0 0 10 10" refX="5" refY="1" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 10 L 5 0 L 10 10 z" fill="#61afef" />
+        </marker>
+      </defs>
+
+      {/* Directed edges with upward arrows pointing towards target */}
+      {edges.map(({ from, to }, index) => {
+        const posChild = nodePositions.get(from)
+        const posParent = nodePositions.get(to)
+        if (!posChild || !posParent) return null
+
+        const x1 = posChild.x
+        const y1 = posChild.y - cardHeight / 2
+        const x2 = posParent.x
+        const y2 = posParent.y + cardHeight / 2
+
+        let d = ''
+        if (Math.abs(x1 - x2) < 2) {
+          d = `M ${x1} ${y1} L ${x2} ${y2}`
+        } else {
+          const midY = (y1 + y2) / 2
+          d = `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`
+        }
+
+        return <path
+          key={`${from}-${to}-${index}`}
+          d={d}
+          fill="none"
+          stroke="#4b5263"
+          strokeWidth="1.5"
+          markerEnd="url(#arrow-up)"
+        />
+      })}
+
+      {/* Hierarchy Node Cards */}
+      {Array.from(nodePositions.entries()).map(([partId, pos]) => {
+        const name = names.get(partId) ?? partId
+        const isTarget = partId === targetAnalysis?.target?.id
+        const isSelected = partId === selectedPart
+
+        return <g
+          key={partId}
+          style={{ cursor: 'pointer' }}
+          onClick={() => onSelectPart(partId)}
+        >
+          <rect
+            x={pos.x - cardWidth / 2}
+            y={pos.y - cardHeight / 2}
+            width={cardWidth}
+            height={cardHeight}
+            rx="4"
+            fill={isTarget ? '#1a2332' : isSelected ? '#2c313a' : '#1a1d23'}
+            stroke={isTarget ? '#61afef' : isSelected ? '#e5c07b' : '#3e4451'}
+            strokeWidth={isTarget || isSelected ? 2 : 1}
+          />
+          <text
+            x={pos.x}
+            y={pos.y + 4}
+            textAnchor="middle"
+            fill={isTarget ? '#61afef' : isSelected ? '#e5c07b' : '#abb2bf'}
+            fontSize="10"
+            fontWeight={isTarget ? '700' : '500'}
+            fontFamily="sans-serif"
+          >
+            {name.length > 15 ? name.slice(0, 14) + '…' : name}
+          </text>
+        </g>
+      })}
+    </svg>
+  </div>
 }
 
 function TreeNode({ node, names, onSelectPart }: { node: DependencyTree; names: Map<string, string>; onSelectPart: (id: string) => void }) {
+
   return <li>
     <button className="tree-node" onClick={() => onSelectPart(node.part_id)}>{names.get(node.part_id) ?? node.part_id}{node.cycle && <em>cycle</em>}</button>
     {node.chosen_exit && <small>{node.chosen_exit.free ? `free ${node.chosen_exit.direction}` : `${node.chosen_exit.direction} after ${node.chosen_exit.blockers.length} blocker${node.chosen_exit.blockers.length === 1 ? '' : 's'}`}</small>}
@@ -231,17 +340,19 @@ function App() {
           <span>{part.name}</span>{heatmap && <span className={`constraint-count c${Math.min(3, constraintCounts.get(part.id) ?? 0)}`}>{constraintCounts.get(part.id) ?? 0}</span>}{part.fastener.value && <em>fastener</em>}
         </button>)}
       </div>
-      <div className="graph-header"><span>Target Graph</span><div className="segmented">
-        {(['combined', 'collision'] as GraphMode[]).map((mode) => <button key={mode} className={graphMode === mode ? 'active' : ''} onClick={() => setGraphMode(mode)}>{mode === 'combined' ? 'All' : 'Collision'}</button>)}
-      </div></div>
+      <div className="graph-header"><span>Dependency Sequence Tree</span></div>
       <div className="edge-list">
-        {!targetAnalysis && <p className="empty">Select a component to view its dependency graph.</p>}
-        {targetAnalysis && edges.length === 0 && <p className="empty">This component has a verified direct exit.</p>}
-        <DependencyGraph edges={edges} names={names} selectedEdge={selectedEdge} onSelectEdge={(edge) => { setSelectedEdge(edge); setSelectedPart(edge.to) }} onSelectPart={(id) => void analyzePart(id)} />
-        {edges.map((edge, index) => <button key={`${edge.from}-${edge.to}-${edge.direction}-${index}`} className={`edge ${selectedEdge === edge ? 'selected' : 'collision'}`} onClick={() => { setSelectedEdge(edge); setSelectedPart(edge.to) }}>
-          <span className="edge-type">→</span><span>{edgeLabel(edge, names)}</span><small>{edge.required ? `required constraint · ${edge.direction}` : `alternative path · ${edge.direction}`}</small>
-        </button>)}
+        {!targetAnalysis && <p className="empty">Select a component to view its dependency tree.</p>}
+        {targetAnalysis && targetAnalysis.dependencies.length === 0 && <p className="empty">This component has a verified direct exit.</p>}
+        <HierarchicalDirectedGraph
+          tree={targetAnalysis?.tree ?? null}
+          targetAnalysis={targetAnalysis}
+          names={names}
+          onSelectPart={(id) => void analyzePart(id)}
+          selectedPart={selectedPart}
+        />
       </div>
+
     </aside>
     <section className="viewport-shell">
       <AssemblyViewport glbUrl={run.glbUrl} manifest={run.manifest} analysis={analysis} selectedPart={selectedPart} selectedEdge={selectedEdge} exploded={exploded} heatmap={heatmap} autoFrame={autoFrame} onManualNavigation={() => setAutoFrame(false)} onSelectPart={(id) => void analyzePart(id)} />
