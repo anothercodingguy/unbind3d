@@ -197,6 +197,58 @@ function Model({ glbUrl, manifest, analysis, selectedPart, selectedEdge, explode
 function ViewportScene(props: ViewportProps) {
   const controls = useRef<OrbitControlsImpl>(null)
   const focus = focusForPart(props.manifest, props.analysis, props.selectedPart ?? props.analysis.target?.id ?? null)
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) return
+      if (!controls.current) return
+
+      const stepAngle = 0.08
+      const panStep = 0.25
+
+      if (e.key === 'ArrowLeft') {
+        if (e.shiftKey) {
+          controls.current.target.x -= panStep
+        } else {
+          const azimuthal = controls.current.getAzimuthalAngle()
+          controls.current.setAzimuthalAngle(azimuthal - stepAngle)
+        }
+        controls.current.update()
+        props.onManualNavigation()
+      } else if (e.key === 'ArrowRight') {
+        if (e.shiftKey) {
+          controls.current.target.x += panStep
+        } else {
+          const azimuthal = controls.current.getAzimuthalAngle()
+          controls.current.setAzimuthalAngle(azimuthal + stepAngle)
+        }
+        controls.current.update()
+        props.onManualNavigation()
+      } else if (e.key === 'ArrowUp') {
+        if (e.shiftKey) {
+          controls.current.target.y += panStep
+        } else {
+          const polar = controls.current.getPolarAngle()
+          controls.current.setPolarAngle(Math.max(0.1, polar - stepAngle))
+        }
+        controls.current.update()
+        props.onManualNavigation()
+      } else if (e.key === 'ArrowDown') {
+        if (e.shiftKey) {
+          controls.current.target.y -= panStep
+        } else {
+          const polar = controls.current.getPolarAngle()
+          controls.current.setPolarAngle(Math.min(Math.PI - 0.1, polar + stepAngle))
+        }
+        controls.current.update()
+        props.onManualNavigation()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [props.onManualNavigation])
+
   return <>
     <color attach="background" args={['#1e2228']} />
     <hemisphereLight intensity={1.1} color="#ffffff" groundColor="#2a2e37" />
@@ -207,9 +259,17 @@ function ViewportScene(props: ViewportProps) {
 
     <Suspense fallback={null}><Model {...props} /></Suspense>
     <CameraRig focus={focus} enabled={props.autoFrame} controls={controls} />
-    <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={0.08} onStart={props.onManualNavigation} />
+    <OrbitControls
+      ref={controls}
+      makeDefault
+      enableDamping
+      dampingFactor={0.08}
+      onStart={props.onManualNavigation}
+    />
+
   </>
 }
+
 
 export default function AssemblyViewport(props: ViewportProps) {
   return <div style={{ width: '100%', height: '100%', position: 'relative' }}>
