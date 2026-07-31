@@ -219,63 +219,62 @@ export default function AssemblyViewport(props: ViewportProps) {
       <ViewportScene {...props} />
     </Canvas>
 
-    {/* Tiny Color Legend Overlay */}
+    {/* Minimal CAD Legend Overlay */}
     <div style={{
       position: 'absolute',
-      bottom: '14px',
-      left: '14px',
+      bottom: '12px',
+      left: '12px',
       display: 'flex',
       alignItems: 'center',
       gap: '12px',
       pointerEvents: 'none',
-      background: 'rgba(28, 32, 39, 0.88)',
-      border: '1px solid #4a5462',
-      borderRadius: '6px',
-      padding: '6px 12px',
-      fontSize: '11px',
-      color: '#d0dbe6',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-      backdropFilter: 'blur(4px)'
+      background: '#1a1d23',
+      border: '1px solid #2d313b',
+      borderRadius: '3px',
+      padding: '5px 10px',
+      fontSize: '10px',
+      fontFamily: 'monospace',
+      color: '#abb2bf'
     }}>
-      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#00e5ff', display: 'inline-block' }}></span> <strong>Selected Part</strong></span>
-      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#ffc107', display: 'inline-block' }}></span> <strong>Dependencies</strong></span>
-      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#7fa99b', display: 'inline-block' }}></span> <strong>Assembly Parts</strong></span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '8px', height: '8px', background: '#00e5ff', display: 'inline-block' }}></span> Target</span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '8px', height: '8px', background: '#ffc107', display: 'inline-block' }}></span> Prerequisites</span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '8px', height: '8px', background: '#7fa99b', display: 'inline-block' }}></span> Assembly</span>
     </div>
 
-    {/* Blender Viewport Axis Legend & Scale Overlay */}
+    {/* Clean Engineering Axis & Scale Overlay */}
     <div style={{
       position: 'absolute',
-      bottom: '14px',
-      right: '14px',
+      bottom: '12px',
+      right: '12px',
       display: 'flex',
       flexDirection: 'column',
-      gap: '4px',
+      gap: '3px',
       pointerEvents: 'none',
-      background: 'rgba(28, 32, 39, 0.85)',
-      border: '1px solid #4a5462',
-      borderRadius: '6px',
-      padding: '8px 12px',
-      fontSize: '11px',
-      color: '#c2d1e0',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-      backdropFilter: 'blur(4px)'
+      background: '#1a1d23',
+      border: '1px solid #2d313b',
+      borderRadius: '3px',
+      padding: '6px 10px',
+      fontSize: '10px',
+      fontFamily: 'monospace',
+      color: '#abb2bf'
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', letterSpacing: '0.06em', color: '#8fa4b8' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.04em' }}>
         <span>AXES:</span>
-        <span style={{ color: '#ff4d4d', fontWeight: 'bold' }}>X (Red)</span>
-        <span style={{ color: '#40d968', fontWeight: 'bold' }}>Y (Green)</span>
-        <span style={{ color: '#409eff', fontWeight: 'bold' }}>Z (Blue)</span>
+        <span style={{ color: '#e06c75', fontWeight: 'bold' }}>X</span>
+        <span style={{ color: '#98c379', fontWeight: 'bold' }}>Y</span>
+        <span style={{ color: '#61afef', fontWeight: 'bold' }}>Z</span>
       </div>
-      <div style={{ display: 'flex', gap: '12px', marginTop: '2px' }}>
-        <span>GRID SCALE: <strong style={{ color: '#ffffff' }}>1.00m / 1000mm</strong></span>
-        <span>SUBDIVISION: <strong style={{ color: '#ffffff' }}>0.25m / 250mm</strong></span>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <span>GRID: <strong>1.00m</strong></span>
+        <span>SUBDIV: <strong>0.25m</strong></span>
       </div>
-      {extent && <div style={{ fontSize: '10px', color: '#00e5ff', marginTop: '2px', borderTop: '1px solid #364150', paddingTop: '4px' }}>
-        PART DIMENSIONS: <strong>{(extent[0] * 1000).toFixed(0)} × {(extent[1] * 1000).toFixed(0)} × {(extent[2] * 1000).toFixed(0)} mm</strong>
+      {extent && <div style={{ color: '#00e5ff', borderTop: '1px solid #2d313b', paddingTop: '3px' }}>
+        BOUNDS: <strong>{(extent[0] * 1000).toFixed(0)} × {(extent[1] * 1000).toFixed(0)} × {(extent[2] * 1000).toFixed(0)} mm</strong>
       </div>}
     </div>
   </div>
 }
+
 
 
 
