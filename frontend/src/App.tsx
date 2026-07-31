@@ -168,6 +168,36 @@ function App() {
   const [analyzingTarget, setAnalyzingTarget] = useState(false)
   const attemptedDefaultRun = useRef(false)
 
+  const [leftWidth, setLeftWidth] = useState(360)
+  const [rightWidth, setRightWidth] = useState(320)
+  const [isResizingLeft, setIsResizingLeft] = useState(false)
+  const [isResizingRight, setIsResizingRight] = useState(false)
+
+  useEffect(() => {
+    function handleMouseMove(e: MouseEvent) {
+      if (isResizingLeft) {
+        setLeftWidth(Math.max(220, Math.min(650, e.clientX)))
+      } else if (isResizingRight) {
+        setRightWidth(Math.max(220, Math.min(650, window.innerWidth - e.clientX)))
+      }
+    }
+
+    function handleMouseUp() {
+      setIsResizingLeft(false)
+      setIsResizingRight(false)
+    }
+
+    if (isResizingLeft || isResizingRight) {
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('mouseup', handleMouseUp)
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isResizingLeft, isResizingRight])
+
+
   const baseAnalysis = run?.analysis
   const analysis = targetAnalysis ?? baseAnalysis
   const parts = analysis?.parts ?? []
@@ -322,7 +352,7 @@ function App() {
     </section>
   </main>
 
-  return <main className="workspace">
+  return <main className="workspace" style={{ gridTemplateColumns: `${leftWidth}px 5px minmax(0, 1fr) 5px ${rightWidth}px` }}>
     <header className="topbar">
       <div><span className="brand">UNBIND3D</span><span className="divider">/</span><span className="run-name">{run.filename}</span></div>
       <div className="top-actions">
@@ -352,8 +382,12 @@ function App() {
           selectedPart={selectedPart}
         />
       </div>
-
     </aside>
+    <div
+      className={`panel-resizer ${isResizingLeft ? 'active' : ''}`}
+      onMouseDown={() => setIsResizingLeft(true)}
+      title="Drag left/right to resize left panel"
+    />
     <section className="viewport-shell">
       <AssemblyViewport glbUrl={run.glbUrl} manifest={run.manifest} analysis={analysis} selectedPart={selectedPart} selectedEdge={selectedEdge} exploded={exploded} heatmap={heatmap} autoFrame={autoFrame} onManualNavigation={() => setAutoFrame(false)} onSelectPart={(id) => void analyzePart(id)} />
       <div className="viewport-label">
@@ -362,7 +396,13 @@ function App() {
       </div>
       {selectedEdge && <div className="collision-callout">Blocked direction · {names.get(selectedEdge.from) ?? selectedEdge.from} constrains {names.get(selectedEdge.to) ?? selectedEdge.to}{selectedEdge.distance !== null ? ` at ${selectedEdge.distance.toFixed(3)} units` : ''}</div>}
     </section>
+    <div
+      className={`panel-resizer ${isResizingRight ? 'active' : ''}`}
+      onMouseDown={() => setIsResizingRight(true)}
+      title="Drag left/right to resize right panel"
+    />
     <aside className="right-panel">
+
       <div className="panel-heading"><span>Prerequisite Inspector</span></div>
       {analyzingTarget && <p className="muted">Evaluating 26 translation vectors and dependency tree...</p>}
 
