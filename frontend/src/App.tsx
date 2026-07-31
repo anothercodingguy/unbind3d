@@ -252,8 +252,9 @@ function App() {
       {selectedEdge && <div className="collision-callout">Blocked direction · {names.get(selectedEdge.from) ?? selectedEdge.from} constrains {names.get(selectedEdge.to) ?? selectedEdge.to}{selectedEdge.distance !== null ? ` at ${selectedEdge.distance.toFixed(3)} units` : ''}</div>}
     </section>
     <aside className="right-panel">
-      <div className="panel-heading"><span>Prerequisite Inspector</span><span className="verified">CALCULATED</span></div>
+      <div className="panel-heading"><span>Prerequisite Inspector</span></div>
       {analyzingTarget && <p className="muted">Evaluating 26 translation vectors and dependency tree...</p>}
+
       {!analyzingTarget && !targetAnalysis && <p className="muted">Select any component to evaluate removal prerequisites.</p>}
       {!analyzingTarget && targetAnalysis && selectedTarget && <>
         <div className="judge-summary-card">

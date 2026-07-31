@@ -94,6 +94,8 @@ function Model({ glbUrl, manifest, analysis, selectedPart, selectedEdge, explode
     return map
   }, [analysis])
 
+  const originalMaterials = useRef(new Map<THREE.Mesh, { color: THREE.Color; roughness: number; metalness: number }>())
+
   useEffect(() => {
     model.traverse((object) => {
       const part = partForNode(object.name)
@@ -109,12 +111,17 @@ function Model({ glbUrl, manifest, analysis, selectedPart, selectedEdge, explode
         if (!(child instanceof THREE.Mesh)) return
         let material = child.material
         if (!(material instanceof THREE.MeshStandardMaterial)) {
-          material = new THREE.MeshStandardMaterial()
-          child.material = material
+          return
         }
         const stdMat = material as THREE.MeshStandardMaterial
-        stdMat.roughness = 0.35
-        stdMat.metalness = 0.08
+        if (!originalMaterials.current.has(child)) {
+          originalMaterials.current.set(child, {
+            color: stdMat.color.clone(),
+            roughness: stdMat.roughness,
+            metalness: stdMat.metalness,
+          })
+        }
+        const orig = originalMaterials.current.get(child)!
         stdMat.transparent = true
 
         const isTarget = part.part_id === selectedPart
@@ -122,15 +129,14 @@ function Model({ glbUrl, manifest, analysis, selectedPart, selectedEdge, explode
         const isEdgeSelected = selectedEdge && (part.part_id === selectedEdge.from || part.part_id === selectedEdge.to)
         const isDimmed = analysis.target && !isTarget && !isPrerequisite
 
-        stdMat.opacity = isDimmed ? 0.30 : 1.0
-
+        stdMat.opacity = isDimmed ? 0.35 : 1.0
 
         if (isTarget) {
           stdMat.color.set('#00e5ff')
           stdMat.emissive.set('#0088cc')
           stdMat.emissiveIntensity = 0.45
         } else if (isEdgeSelected) {
-          stdMat.color.set('#ff4d4f')
+          stdMat.color.set('#e06c75')
           stdMat.emissive.set('#991111')
           stdMat.emissiveIntensity = 0.5
         } else if (isPrerequisite) {
@@ -139,19 +145,22 @@ function Model({ glbUrl, manifest, analysis, selectedPart, selectedEdge, explode
           stdMat.emissiveIntensity = 0.35
         } else if (heatmap) {
           const count = blockerCounts.get(part.part_id) ?? 0
-          const heatColor = count >= 4 ? '#ff3b30' : count >= 2 ? '#ff9500' : '#34c759'
+          const heatColor = count >= 4 ? '#e06c75' : count >= 2 ? '#e5c07b' : '#98c379'
           stdMat.color.set(heatColor)
           stdMat.emissive.set(heatColor)
           stdMat.emissiveIntensity = 0.25
         } else {
-          // Blender Workbench Random Pastel Palette
-          stdMat.color.set(partRandomColor(part.part_id))
+          // Restore exact original CAD model material color, roughness, and metalness
+          stdMat.color.copy(orig.color)
+          stdMat.roughness = orig.roughness
+          stdMat.metalness = orig.metalness
           stdMat.emissive.set('#000000')
           stdMat.emissiveIntensity = 0.0
         }
       })
     })
   }, [model, analysis, selectedPart, selectedEdge, exploded, heatmap, prerequisiteIds, blockerCounts])
+
 
   const focusedPart = analysis.parts.find((part) => part.id === selectedPart)
   const { evaluation, option } = chosenExit(analysis, selectedPart)
