@@ -132,33 +132,40 @@ function App() {
     }
   }
 
-  useEffect(() => {
-    if (attemptedDefaultRun.current) return
-    attemptedDefaultRun.current = true
-    void (async () => {
-      try {
-        const response = await fetch('http://127.0.0.1:8000/api/default-run')
-        if (response.status === 404) return
-        if (!response.ok) throw new Error('Could not open the prepared assembly.')
-        await openDgp(new File([await response.blob()], 'assembly.dgp', { type: 'application/zip' }))
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'Could not open the prepared assembly.')
-      }
-    })()
-  }, [])
+  async function loadSampleAssembly() {
+    try {
+      setPreparing(true)
+      setError(null)
+      const response = await fetch('http://127.0.0.1:8000/api/default-run')
+      if (!response.ok) throw new Error('Could not fetch the default CAD assembly.')
+      await openDgp(new File([await response.blob()], 'Hackathon_micscroscope-disassembly.dgp', { type: 'application/zip' }))
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not open sample assembly.')
+    } finally {
+      setPreparing(false)
+    }
+  }
 
   if (!run || !analysis) return <main className="landing">
     <section className="landing-card">
       <div className="eyebrow">UNBIND3D / TARGET DEPENDENCY ANALYSIS</div>
       <h1>Ask one part how to get out.</h1>
-      <p>Drop the supplied <code>.blend</code>. Blender extracts the assembly once; then select the part whose removal prerequisites you want to inspect.</p>
+      <p>Upload a CAD <code>.blend</code> file. Blender headlessly extracts the 3D assembly, geometry, and manifest; then select any part to analyze its exact removal prerequisites.</p>
       <label className="drop-zone">
         <input type="file" accept=".blend,.dgp" onChange={(event) => void handleFile(event.target.files?.[0])} />
-        <strong>{preparing ? 'Extracting Blender assembly…' : 'Open .blend file'}</strong><span>Prepared DGP packages can also be reopened</span>
+        <strong>{preparing ? 'Extracting Blender assembly geometry…' : '📁 Choose / Drop .blend file'}</strong>
+        <span>Upload your .blend file or prepared .dgp package</span>
       </label>
+
+      <div style={{ margin: '18px 0 0', textAlign: 'center' }}>
+        <button className="primary" style={{ width: '100%', padding: '12px', fontSize: '13px', fontWeight: 600 }} onClick={() => void loadSampleAssembly()} disabled={preparing}>
+          {preparing ? 'Extracting Blender CAD Assembly...' : '⚡ Load Microscope CAD Assembly (.blend)'}
+        </button>
+      </div>
       {error && <p className="error">{error}</p>}
     </section>
   </main>
+
 
   return <main className="workspace">
     <header className="topbar">
