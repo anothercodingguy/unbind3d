@@ -122,7 +122,8 @@ function Model({ glbUrl, manifest, analysis, selectedPart, selectedEdge, explode
         const isEdgeSelected = selectedEdge && (part.part_id === selectedEdge.from || part.part_id === selectedEdge.to)
         const isDimmed = analysis.target && !isTarget && !isPrerequisite
 
-        stdMat.opacity = isDimmed ? 0.28 : 1.0
+        stdMat.opacity = isDimmed ? 0.30 : 1.0
+
 
         if (isTarget) {
           stdMat.color.set('#00e5ff')
@@ -218,6 +219,29 @@ export default function AssemblyViewport(props: ViewportProps) {
       <ViewportScene {...props} />
     </Canvas>
 
+    {/* Tiny Color Legend Overlay */}
+    <div style={{
+      position: 'absolute',
+      bottom: '14px',
+      left: '14px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      pointerEvents: 'none',
+      background: 'rgba(28, 32, 39, 0.88)',
+      border: '1px solid #4a5462',
+      borderRadius: '6px',
+      padding: '6px 12px',
+      fontSize: '11px',
+      color: '#d0dbe6',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+      backdropFilter: 'blur(4px)'
+    }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#00e5ff', display: 'inline-block' }}></span> <strong>Selected Part</strong></span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#ffc107', display: 'inline-block' }}></span> <strong>Dependencies</strong></span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#7fa99b', display: 'inline-block' }}></span> <strong>Assembly Parts</strong></span>
+    </div>
+
     {/* Blender Viewport Axis Legend & Scale Overlay */}
     <div style={{
       position: 'absolute',
@@ -252,5 +276,6 @@ export default function AssemblyViewport(props: ViewportProps) {
     </div>
   </div>
 }
+
 
 

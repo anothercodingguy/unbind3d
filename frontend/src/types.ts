@@ -97,7 +97,10 @@ export interface TargetAnalysis {
   mode: 'target_prerequisite_workspace' | 'target_prerequisite_analysis'
   engine: string
   verified: boolean
+  analysis_time_ms?: number
+  total_edges_count?: number
   parts: AnalysisPart[]
+
   target: AnalysisPart | null
   dependencies: DependencyRecord[]
   prerequisite_order: string[]

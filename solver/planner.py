@@ -181,7 +181,10 @@ class DisassemblySolver:
         the fixed direction enumeration.  This is target-local dependency
         resolution, not a global assembly plan.
         """
+        import time
+        start_time = time.perf_counter()
         target_id = self._resolve_part_id(target_part_name)
+
 
         @lru_cache(maxsize=8192)
         def resolve(part_id: str, ancestry: tuple[str, ...]) -> dict[str, Any]:
@@ -327,12 +330,16 @@ class DisassemblySolver:
         node_evaluations = [self._evaluate(part_id) for part_id in sorted(visited, key=lambda item: self.parts[item].order)]
         unresolved = None if root["complete"] else {"reason": root["reason"], "target": target_id}
         target = self._part_summary(self.parts[target_id])
+        elapsed_ms = round((time.perf_counter() - start_time) * 1000, 1)
         return {
             "schema_version": "2.0",
             "mode": "target_prerequisite_analysis",
             "engine": self.engine.name,
             "verified": self.engine.certified,
+            "analysis_time_ms": elapsed_ms,
+            "total_edges_count": len(evidence),
             "parts": [self._part_summary(part) for part in sorted(self.parts.values(), key=lambda item: item.order)],
+
             "target": target,
             "dependencies": dependencies,
             "prerequisite_order": prerequisite_order,
