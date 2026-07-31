@@ -72,9 +72,15 @@ function App() {
     return counts
   }, [targetAnalysis])
 
+  const analysisCache = useRef(new Map<string, TargetAnalysis>())
+
   async function openDgp(file: File) {
     const nextRun = await loadDgp(file)
     if (run) URL.revokeObjectURL(run.glbUrl)
+    analysisCache.current.clear()
+    if (nextRun.analysis.target) {
+      analysisCache.current.set(nextRun.analysis.target.id, nextRun.analysis)
+    }
     setRun(nextRun)
     setTargetAnalysis(nextRun.analysis.target ? nextRun.analysis : null)
     setSelectedPart(nextRun.analysis.target?.id ?? null)
@@ -110,6 +116,23 @@ function App() {
 
   async function analyzePart(partId: string) {
     if (!run) return
+
+    // Do not re-analyze if selecting the currently active target
+    if (selectedTarget?.id === partId && targetAnalysis) {
+      setSelectedPart(partId)
+      setSelectedEdge(null)
+      return
+    }
+
+    // Return instant cached result if this part was analyzed previously
+    if (analysisCache.current.has(partId)) {
+      const cached = analysisCache.current.get(partId)!
+      setTargetAnalysis(cached)
+      setSelectedPart(cached.target?.id ?? partId)
+      setSelectedEdge(null)
+      return
+    }
+
     setSelectedPart(partId)
     setSelectedEdge(null)
     setAnalyzingTarget(true)
@@ -123,6 +146,7 @@ function App() {
       const payload = await response.json() as TargetAnalysis | { detail: string }
       if (!response.ok) throw new Error((payload as { detail: string }).detail)
       const next = payload as TargetAnalysis
+      analysisCache.current.set(partId, next)
       setTargetAnalysis(next)
       setSelectedPart(next.target?.id ?? partId)
     } catch (caught) {
@@ -131,6 +155,7 @@ function App() {
       setAnalyzingTarget(false)
     }
   }
+
 
   async function loadSampleAssembly() {
     try {
