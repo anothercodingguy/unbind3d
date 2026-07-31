@@ -108,11 +108,12 @@ function Model({ glbUrl, manifest, analysis, selectedPart, selectedEdge, explode
 
       if (!originals.current.has(part.part_id)) originals.current.set(part.part_id, object.position.clone())
       const base = originals.current.get(part.part_id)!.clone()
-      const { option } = chosenExit(analysis, part.part_id)
-      if (exploded && option && (part.part_id === analysis.target?.id || prerequisiteIds.has(part.part_id))) {
-        base.addScaledVector(asVector(option.vector), Math.min(option.travel_distance * 0.12, 1.1))
+      const { option: exitOpt } = chosenExit(analysis, part.part_id)
+      if (exploded && exitOpt && (part.part_id === analysis.target?.id || prerequisiteIds.has(part.part_id))) {
+        base.addScaledVector(asVector(exitOpt.vector), Math.min(exitOpt.travel_distance * 0.12, 1.1))
       }
       object.position.copy(base)
+
 
       object.traverse((child) => {
         if (!(child instanceof THREE.Mesh)) return

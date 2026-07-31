@@ -7,6 +7,13 @@ disassembly sequence or guess a first removable part.
 > **Core Principle:** The solver never guesses. Every prerequisite edge is
 > backed by an actual continuous collision test.
 
+## Demo Video
+
+[![Unbind3D Demo](https://img.youtube.com/vi/25Nv-bE9aks/maxresdefault.jpg)](https://youtu.be/25Nv-bE9aks)
+
+▶ **[Watch the demo on YouTube](https://youtu.be/25Nv-bE9aks)**
+
+
 ## How it works
 
 1. Blender headlessly extracts `Microscope_circuit` into `assembly.glb` and
