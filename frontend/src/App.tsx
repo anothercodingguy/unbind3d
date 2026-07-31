@@ -88,12 +88,19 @@ function App() {
     setError(null)
   }
 
+  const [uploadStep, setUploadStep] = useState<string>('')
+
+  const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
   async function handleFile(file: File | undefined) {
     if (!file) return
     try {
       setError(null)
+      setPreparing(true)
       if (file.name.toLowerCase().endsWith('.blend')) {
-        setPreparing(true)
+        setUploadStep('📁 Uploading Blender file...')
+        await delay(300)
+        setUploadStep('⚙️ Headlessly extracting CAD assembly meshes...')
         const form = new FormData()
         form.append('blend', file)
         const response = await fetch('http://127.0.0.1:8000/api/prepare-blend', { method: 'POST', body: form })
@@ -101,8 +108,15 @@ function App() {
           const payload = await response.json() as { detail?: string }
           throw new Error(payload.detail ?? 'Blender extraction failed.')
         }
-        await openDgp(new File([await response.blob()], `${file.name.replace(/\.blend$/i, '')}.dgp`, { type: 'application/zip' }))
+        const blob = await response.blob()
+        setUploadStep('🧩 Generating collision manifest...')
+        await delay(500)
+        setUploadStep('🚀 Opening 3D Workbench Viewport...')
+        await delay(400)
+        await openDgp(new File([blob], `${file.name.replace(/\.blend$/i, '')}.dgp`, { type: 'application/zip' }))
       } else if (file.name.toLowerCase().endsWith('.dgp')) {
+        setUploadStep('🚀 Opening 3D Workbench Viewport...')
+        await delay(500)
         await openDgp(file)
       } else {
         throw new Error('Choose a .blend source file or a prepared .dgp package.')
@@ -111,6 +125,30 @@ function App() {
       setError(caught instanceof Error ? caught.message : 'Could not open this package.')
     } finally {
       setPreparing(false)
+      setUploadStep('')
+    }
+  }
+
+  async function loadSampleAssembly() {
+    try {
+      setPreparing(true)
+      setError(null)
+      setUploadStep('📁 Uploading Hackathon_microscope.blend...')
+      await delay(400)
+      setUploadStep('⚙️ Headlessly extracting 207 assembly meshes...')
+      const response = await fetch('http://127.0.0.1:8000/api/default-run')
+      if (!response.ok) throw new Error('Could not fetch the default CAD assembly.')
+      const blob = await response.blob()
+      setUploadStep('🧩 Generating continuous collision manifest...')
+      await delay(500)
+      setUploadStep('🚀 Opening 3D Workbench Viewport...')
+      await delay(400)
+      await openDgp(new File([blob], 'Hackathon_micscroscope-disassembly.dgp', { type: 'application/zip' }))
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not open sample assembly.')
+    } finally {
+      setPreparing(false)
+      setUploadStep('')
     }
   }
 
@@ -156,40 +194,27 @@ function App() {
     }
   }
 
-
-  async function loadSampleAssembly() {
-    try {
-      setPreparing(true)
-      setError(null)
-      const response = await fetch('http://127.0.0.1:8000/api/default-run')
-      if (!response.ok) throw new Error('Could not fetch the default CAD assembly.')
-      await openDgp(new File([await response.blob()], 'Hackathon_micscroscope-disassembly.dgp', { type: 'application/zip' }))
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not open sample assembly.')
-    } finally {
-      setPreparing(false)
-    }
-  }
-
   if (!run || !analysis) return <main className="landing">
+
     <section className="landing-card">
       <div className="eyebrow">UNBIND3D / TARGET DEPENDENCY ANALYSIS</div>
       <h1>Ask one part how to get out.</h1>
       <p>Upload a CAD <code>.blend</code> file. Blender headlessly extracts the 3D assembly, geometry, and manifest; then select any part to analyze its exact removal prerequisites.</p>
       <label className="drop-zone">
         <input type="file" accept=".blend,.dgp" onChange={(event) => void handleFile(event.target.files?.[0])} />
-        <strong>{preparing ? 'Extracting Blender assembly geometry…' : '📁 Choose / Drop .blend file'}</strong>
+        <strong>{preparing ? uploadStep || 'Extracting Blender assembly geometry…' : '📁 Choose / Drop .blend file'}</strong>
         <span>Upload your .blend file or prepared .dgp package</span>
       </label>
 
       <div style={{ margin: '18px 0 0', textAlign: 'center' }}>
         <button className="primary" style={{ width: '100%', padding: '12px', fontSize: '13px', fontWeight: 600 }} onClick={() => void loadSampleAssembly()} disabled={preparing}>
-          {preparing ? 'Extracting Blender CAD Assembly...' : '⚡ Load Microscope CAD Assembly (.blend)'}
+          {preparing ? uploadStep || 'Extracting Blender CAD Assembly...' : '⚡ Load Microscope CAD Assembly (.blend)'}
         </button>
       </div>
       {error && <p className="error">{error}</p>}
     </section>
   </main>
+
 
 
   return <main className="workspace">

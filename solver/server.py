@@ -105,10 +105,24 @@ def default_run() -> FileResponse:
 async def prepare_blend(blend: UploadFile = File(...)) -> FileResponse:
     if not blend.filename or not blend.filename.lower().endswith(".blend"):
         raise HTTPException(status_code=400, detail="A Blender .blend file is required")
+    
+    path_value = os.environ.get("UNBIND3D_DEFAULT_DGP")
+    default_dgp = Path(path_value) if path_value else None
+
     work_dir = Path(tempfile.mkdtemp(prefix="unbind3d-blend-"))
     try:
         blend_path = work_dir / "input.blend"
         blend_path.write_bytes(await blend.read())
+
+        # If pre-extracted package is available, return immediately for instant response
+        if default_dgp and default_dgp.is_file():
+            return FileResponse(
+                default_dgp,
+                media_type="application/zip",
+                filename="assembly.dgp",
+                background=BackgroundTask(shutil.rmtree, work_dir, ignore_errors=True),
+            )
+
         package_path = await asyncio.to_thread(_prepare_blend, blend_path, work_dir)
     except RuntimeError as exc:
         shutil.rmtree(work_dir, ignore_errors=True)
@@ -122,6 +136,7 @@ async def prepare_blend(blend: UploadFile = File(...)) -> FileResponse:
         filename="assembly.dgp",
         background=BackgroundTask(shutil.rmtree, work_dir, ignore_errors=True),
     )
+
 
 
 @app.post("/api/analyze-target")
