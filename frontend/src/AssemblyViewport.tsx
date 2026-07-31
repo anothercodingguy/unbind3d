@@ -198,20 +198,12 @@ function ViewportScene(props: ViewportProps) {
   const controls = useRef<OrbitControlsImpl>(null)
   const focus = focusForPart(props.manifest, props.analysis, props.selectedPart ?? props.analysis.target?.id ?? null)
   return <>
-    <color attach="background" args={['#282b30']} />
-    <hemisphereLight intensity={0.95} color="#ffffff" groundColor="#333842" />
-    <ambientLight intensity={0.7} />
-    <directionalLight position={[10, 15, 10]} intensity={1.8} castShadow />
-    <directionalLight position={[-10, 8, -10]} intensity={0.9} />
-    <directionalLight position={[0, -10, 5]} intensity={0.4} />
-
-    {/* Blender X (Red), Y (Green), Z (Blue) Axis Lines */}
-    <Line points={[[-60, 0, 0], [60, 0, 0]]} color="#ff3b30" lineWidth={2} transparent opacity={0.75} />
-    <Line points={[[0, 0, -60], [0, 0, 60]]} color="#34c759" lineWidth={2} transparent opacity={0.75} />
-    <Line points={[[0, -60, 0], [0, 60, 0]]} color="#007aff" lineWidth={2} transparent opacity={0.65} />
-
-    {/* Blender Dual Scale Grid */}
-    <Grid args={[40, 40]} cellSize={0.25} cellThickness={0.4} cellColor="#3c434f" sectionSize={1.0} sectionThickness={1.2} sectionColor="#647185" fadeDistance={40} fadeStrength={1.2} infiniteGrid />
+    <color attach="background" args={['#1e2228']} />
+    <hemisphereLight intensity={1.1} color="#ffffff" groundColor="#2a2e37" />
+    <ambientLight intensity={0.85} />
+    <directionalLight position={[12, 16, 12]} intensity={2.0} castShadow />
+    <directionalLight position={[-12, 10, -12]} intensity={1.0} />
+    <directionalLight position={[0, -12, 6]} intensity={0.5} />
 
     <Suspense fallback={null}><Model {...props} /></Suspense>
     <CameraRig focus={focus} enabled={props.autoFrame} controls={controls} />
@@ -220,69 +212,13 @@ function ViewportScene(props: ViewportProps) {
 }
 
 export default function AssemblyViewport(props: ViewportProps) {
-  const selectedPartObj = props.analysis.parts.find((part) => part.id === props.selectedPart)
-  const extent = selectedPartObj ? selectedPartObj.bounds[1].map((v, i) => (v - selectedPartObj.bounds[0][i])) : null
-
   return <div style={{ width: '100%', height: '100%', position: 'relative' }}>
     <Canvas shadows camera={{ position: [5, 4, 6], fov: 42 }} dpr={[1, 2]}>
       <ViewportScene {...props} />
     </Canvas>
-
-    {/* Minimal CAD Legend Overlay */}
-    <div style={{
-      position: 'absolute',
-      bottom: '12px',
-      left: '12px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '12px',
-      pointerEvents: 'none',
-      background: '#1a1d23',
-      border: '1px solid #2d313b',
-      borderRadius: '3px',
-      padding: '5px 10px',
-      fontSize: '10px',
-      fontFamily: 'monospace',
-      color: '#abb2bf'
-    }}>
-      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '8px', height: '8px', background: '#00e5ff', display: 'inline-block' }}></span> Target</span>
-      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '8px', height: '8px', background: '#ffc107', display: 'inline-block' }}></span> Prerequisites</span>
-      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '8px', height: '8px', background: '#7fa99b', display: 'inline-block' }}></span> Assembly</span>
-    </div>
-
-    {/* Clean Engineering Axis & Scale Overlay */}
-    <div style={{
-      position: 'absolute',
-      bottom: '12px',
-      right: '12px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '3px',
-      pointerEvents: 'none',
-      background: '#1a1d23',
-      border: '1px solid #2d313b',
-      borderRadius: '3px',
-      padding: '6px 10px',
-      fontSize: '10px',
-      fontFamily: 'monospace',
-      color: '#abb2bf'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.04em' }}>
-        <span>AXES:</span>
-        <span style={{ color: '#e06c75', fontWeight: 'bold' }}>X</span>
-        <span style={{ color: '#98c379', fontWeight: 'bold' }}>Y</span>
-        <span style={{ color: '#61afef', fontWeight: 'bold' }}>Z</span>
-      </div>
-      <div style={{ display: 'flex', gap: '10px' }}>
-        <span>GRID: <strong>1.00m</strong></span>
-        <span>SUBDIV: <strong>0.25m</strong></span>
-      </div>
-      {extent && <div style={{ color: '#00e5ff', borderTop: '1px solid #2d313b', paddingTop: '3px' }}>
-        BOUNDS: <strong>{(extent[0] * 1000).toFixed(0)} × {(extent[1] * 1000).toFixed(0)} × {(extent[2] * 1000).toFixed(0)} mm</strong>
-      </div>}
-    </div>
   </div>
 }
+
 
 
 
